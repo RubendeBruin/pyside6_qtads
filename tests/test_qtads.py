@@ -70,6 +70,80 @@ class TestSimpleWindow(unittest.TestCase):
     def test_window_is_visible(self):
         assert self.window.isVisible()
 
+    def test_use_native_windows_flag_accessible(self):
+        # UseNativeWindows config flag must be accessible for users to resolve
+        # drawing artifacts when mixing native and alien widgets (e.g. OpenGL)
+        assert hasattr(QtAds.CDockManager, 'UseNativeWindows')
+
+    def test_use_native_windows_flag_value(self):
+        # UseNativeWindows must have the correct bit value (0x40000000)
+        assert int(QtAds.CDockManager.UseNativeWindows) == 0x40000000
+
+
+class NativeWindowsWindow(QMainWindow):
+    """
+    Creates a main window with UseNativeWindows enabled in the dock manager.
+    This configuration resolves drawing artifacts when mixing native widgets
+    (e.g. QOpenGLWidget) with alien widgets in the same application.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setGeometry(0, 0, 400, 300)
+
+        # Enable UseNativeWindows before creating the dock manager so that
+        # CDockWidget and CDockAreaWidget call winId() in their constructors,
+        # giving each a native window handle. This prevents the rendering
+        # artifacts that occur when Qt mixes native and alien siblings.
+        QtAds.CDockManager.setConfigFlag(QtAds.CDockManager.UseNativeWindows, True)
+
+        self.dock_manager = QtAds.CDockManager(self)
+
+        dock_inner_widget = QLabel("Native windows enabled")
+        dock_widget = QtAds.CDockWidget("NativeLabel")
+        dock_widget.setWidget(dock_inner_widget)
+        self.dock_manager.addDockWidget(QtAds.TopDockWidgetArea, dock_widget)
+        self.dock_widget = dock_widget
+
+
+class TestUseNativeWindowsFlag(unittest.TestCase):
+    """
+    Tests that the UseNativeWindows config flag works correctly.
+
+    Drawing artifacts occur when Qt applications mix native widgets (those with
+    their own native window handle, such as QOpenGLWidget) with alien widgets
+    (regular QWidget subclasses that share their parent's window handle). In
+    pure C++ applications the UseNativeWindows flag can be set on CDockManager
+    to make every dock and area widget call winId(), forcing them to become
+    native. The Python bindings must expose this flag so that Python users can
+    apply the same fix.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not QApplication.instance():
+            cls.app = QApplication(sys.argv)
+
+    def setUp(self):
+        # Reset to default config before each test
+        QtAds.CDockManager.setConfigFlag(QtAds.CDockManager.UseNativeWindows, False)
+        self.window = NativeWindowsWindow()
+        self.window.show()
+
+    def tearDown(self):
+        self.window.close()
+        QtAds.CDockManager.setConfigFlag(QtAds.CDockManager.UseNativeWindows, False)
+
+    def test_native_windows_window_is_visible(self):
+        assert self.window.isVisible()
+
+    def test_dock_widget_is_native_when_flag_set(self):
+        # With UseNativeWindows enabled every CDockWidget must have been made
+        # native (WA_NativeWindow attribute set) so that it can be composited
+        # correctly alongside other native widgets in the application.
+        assert self.window.dock_widget.testAttribute(Qt.WA_NativeWindow)
+
 
 if __name__ == '__main__':
     unittest.main()
