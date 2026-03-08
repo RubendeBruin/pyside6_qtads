@@ -331,6 +331,31 @@
                 </modify-argument>
             </modify-function>
             <modify-function signature="setWidget(QWidget*, ads::CDockWidget::eInsertMode)">
+                <inject-code class="target" position="beginning">
+                // Widgets such as QVTKRenderWindowInteractor call winId() in
+                // their constructor without first setting
+                // Qt::WA_DontCreateNativeAncestors.  That causes Qt to promote
+                // every ancestor widget to native, which propagates through the
+                // dock hierarchy (scroll area, CDockAreaWidget, CDockManager, …)
+                // and produces drawing artifacts when a floating dock window is
+                // resized.  Setting Qt::WA_DontCreateNativeAncestors on every
+                // native widget in the subtree here – before the widget is
+                // reparented into the dock hierarchy – caps the propagation at
+                // the dock boundary while the native child keeps its own handle.
+                if (%1) {
+                    if (%1->testAttribute(Qt::WA_NativeWindow)
+                            &amp;&amp; !%1->testAttribute(Qt::WA_DontCreateNativeAncestors)) {
+                        %1->setAttribute(Qt::WA_DontCreateNativeAncestors);
+                    }
+                    const auto nativeChildren = %1->findChildren&lt;QWidget *&gt;();
+                    for (QWidget *child : nativeChildren) {
+                        if (child->testAttribute(Qt::WA_NativeWindow)
+                                &amp;&amp; !child->testAttribute(Qt::WA_DontCreateNativeAncestors)) {
+                            child->setAttribute(Qt::WA_DontCreateNativeAncestors);
+                        }
+                    }
+                }
+                </inject-code>
                 <modify-argument index="1">
                     <parent index="this" action="add"/>
                 </modify-argument>
