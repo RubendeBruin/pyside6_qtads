@@ -38,22 +38,6 @@ jobs:
             pyside_ver: ${{ needs.build_src.outputs.rel0 }}
             wheel: cp39-win_amd64
             arch: x86_64
-          - os: windows-11-arm
-            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-win_arm64
-            arch: arm64
-          - os: ubuntu-latest
-            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-manylinux_x86_64
-            arch: x86_64
-          - os: macos-15-intel
-            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-macosx_x86_64
-            arch: x86_64
-          - os: macos-latest
-            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-macosx_arm64
-            arch: arm64
     steps:
       - name: Download sdist
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
@@ -220,23 +204,3 @@ jobs:
         with:
           name: wheel-${{ matrix.wheel }}
           path: ./dist-repaired/*.whl
-
-  upload_pypi:
-    needs: [build_wheels, build_aarch64_wheel, build_src]
-    runs-on: ubuntu-latest
-    # upload to PyPI on every tag starting with 'v'
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
-        with:
-          name: source
-          path: dist
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
-        with:
-          pattern: wheel-*
-          path: dist
-          merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
