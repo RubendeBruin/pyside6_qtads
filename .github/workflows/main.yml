@@ -10,10 +10,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
-      - name: Query PyPI for recent PySide release number
+      - name: Query PyPI for recent PySide 6.10.x release number
         id: query
         run: |
-          echo "rel0=$(curl -s https://pypi.org/pypi/PySide6/json | jq -r .info.version)" >> $GITHUB_OUTPUT
+          echo "rel0=$(curl -s https://pypi.org/pypi/PySide6/json | jq -r '[.releases | keys[] | select(startswith("6.10."))] | sort | last')" >> $GITHUB_OUTPUT
       - name: Build sdist
         env:
           PYSIDE6_QTADS_NO_HARD_PYSIDE_REQUIREMENT: 1
@@ -21,7 +21,7 @@ jobs:
           python -m pip install --user build
           python -m build --sdist
       - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
         with:
           name: source
           path: dist/*.tar.gz
@@ -36,11 +36,27 @@ jobs:
         include:
           - os: windows-latest
             pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-win_amd64
+            wheel: cp310-win_amd64
             arch: x86_64
+          - os: windows-11-arm
+            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
+            wheel: cp310-win_arm64
+            arch: arm64
+          - os: ubuntu-latest
+            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
+            wheel: cp310-manylinux_x86_64
+            arch: x86_64
+          - os: macos-15-intel
+            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
+            wheel: cp310-macosx_x86_64
+            arch: x86_64
+          - os: macos-latest
+            pyside_ver: ${{ needs.build_src.outputs.rel0 }}
+            wheel: cp310-macosx_arm64
+            arch: arm64
     steps:
       - name: Download sdist
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4
         with:
           name: source
       - name: Unpack sdist
@@ -92,7 +108,7 @@ jobs:
           version: "19"
           directory: "C:\\llvm"
       - name: Build wheels
-        uses: pypa/cibuildwheel@298ed2fb2c105540f5ed055e8a6ad78d82dd3a7e # v3.3.1
+        uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.4.1
         with:
           output-dir: wheelhouse
         env:
@@ -118,8 +134,9 @@ jobs:
             python3 -m pip install "aqtinstall!=3.2.1"
             && python3 -m aqt install-qt mac desktop ${{ env.QT_VERSION }} --outputdir ${{ env.QT_BASE_DIR }} --base http://mirrors.ocf.berkeley.edu/qt/
             && python3 ./scripts/set-qt-constraint.py ${{ matrix.pyside_ver }}
+          # Installing aqtinstall from Git for https://github.com/miurahr/aqtinstall/pull/1000
           CIBW_BEFORE_BUILD_WINDOWS: >
-            python3 -m pip install "aqtinstall!=3.2.1"
+            python3 -m pip install git+https://github.com/miurahr/aqtinstall.git
             && python3 -m aqt install-qt ${{ env.QT_PLATFORM }} desktop ${{ env.QT_VERSION }} ${{ env.QT_ARCH }} --outputdir ${{ env.QT_BASE_DIR }} --base http://mirrors.ocf.berkeley.edu/qt/
             && python3 ./scripts/set-qt-constraint.py ${{ matrix.pyside_ver }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_34
@@ -133,7 +150,7 @@ jobs:
           CIBW_TEST_COMMAND: python -m unittest discover -v -s {package}/tests
           CIBW_TEST_COMMAND_LINUX: QT_QPA_PLATFORM=minimal:enable_fonts python -m unittest discover -v -s {package}/tests
       - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
         with:
           name: wheel-${{ matrix.wheel }}
           path: ./wheelhouse/*.whl
@@ -146,12 +163,12 @@ jobs:
         include:
           - os: ubuntu-24.04-arm
             pyside_ver: ${{ needs.build_src.outputs.rel0 }}
-            wheel: cp39-manylinux_aarch64
+            wheel: cp310-manylinux_aarch64
             arch: aarch64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download sdist
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4
         with:
           name: source
       - name: Unpack sdist
@@ -172,9 +189,9 @@ jobs:
                   python3-pip \
                   libxkbcommon-dev
       - name: Install uv
-        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v6
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v6
         with:
-          python-version: "3.9"
+          python-version: "3.10"
           activate-environment: true
       - name: Install Python dependencies
         run: uv pip install "aqtinstall!=3.2.1" PySide6 auditwheel
@@ -200,7 +217,27 @@ jobs:
           cd tests
           python -m unittest discover
       - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
         with:
           name: wheel-${{ matrix.wheel }}
           path: ./dist-repaired/*.whl
+
+  upload_pypi:
+    needs: [build_wheels, build_aarch64_wheel, build_src]
+    runs-on: ubuntu-latest
+    # upload to PyPI on every tag starting with 'v'
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4
+        with:
+          name: source
+          path: dist
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}

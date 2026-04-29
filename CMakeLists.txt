@@ -215,17 +215,12 @@ set(shiboken_options --generator-set=shiboken --enable-parent-ctor-heuristic
     -T${CMAKE_CURRENT_SOURCE_DIR}
     -T${pyside_path}/typesystems
     --output-directory=${CMAKE_CURRENT_BINARY_DIR}
-    --stub-out-dir=${CMAKE_CURRENT_BINARY_DIR}
     )
 
 set(generated_sources_dependencies ${wrapped_header} ${typesystem_file})
 
-set(generated_stubs
-    ${CMAKE_CURRENT_BINARY_DIR}/${bindings_library}/${bindings_library}.pyi
-    )
-
 # Add custom target to run shiboken to generate the binding cpp files.
-add_custom_command(OUTPUT ${generated_sources} ${generated_stubs}
+add_custom_command(OUTPUT ${generated_sources}
                     COMMAND ${shiboken_path}
                     ${shiboken_options} ${wrapped_header} ${typesystem_file}
                     DEPENDS ${generated_sources_dependencies}
@@ -258,7 +253,7 @@ if(NOT WIN32)
 target_compile_options(qtadvanceddocking-qt6 PRIVATE -Og -fPIC)
 target_compile_options(${bindings_library} PRIVATE -Og -fPIC)
 endif()
-target_compile_definitions(${bindings_library} PRIVATE "-DPy_LIMITED_API=0x03090000")
+target_compile_definitions(${bindings_library} PRIVATE "-DPy_LIMITED_API=0x030A0000")
 
 # Adjust the name of generated module.
 set_property(TARGET ${bindings_library} PROPERTY PREFIX "")
@@ -284,10 +279,6 @@ endif()
 install(TARGETS ${bindings_library}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
-        )
-
-install(FILES ${generated_stubs}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}
         )
 
 if(NOT BUILD_STATIC)
